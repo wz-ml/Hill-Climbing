@@ -3,6 +3,7 @@ layout: post
 title:  "Robust Inverse RL, Explained"
 date:   2024-05-10 12:27:49 -0700
 categories: post
+excerpt_separator: <!--more-->
 ---
 ### Tl;dr 
 RAMBO-RL is an offline RL algorithm that is based on three primary ideas:
@@ -11,6 +12,7 @@ RAMBO-RL is an offline RL algorithm that is based on three primary ideas:
 3. We can embed this adversary into the state transition model.
 
 #### Got more time? Read on.
+<!--more-->
 
 ## RARL
 
