@@ -37,7 +37,7 @@ Initialize $\hat{\pi}$
 For $i = 1$ to $N$ do:
 - $\pi_i = \beta_i \pi^* + (1 - \beta_i)\hat{\pi}$
 - Rollout policy $\pi_i$ to sample trajectory $\tau = \{x_0, x_1,...\}$
-- Query expert to generate dataset $\mathcal{D}_i = \{(x_0, \pi^*(x_0)), (x_1, \pi^*(x_1)), ...\}$
+- Query expert to generate dataset $\mathcal{D}_i = \{(x_0, \pi^* (x_0)), (x_1, \pi^* (x_1)), ...\}$
 - Aggregate datasets: $\mathcal{D} \leftarrow \mathcal{D} \cup \mathcal{D}_i$
 - Retrain policy $\hat{\pi}$ using aggregated dataset $\mathcal{D}$.
 
