@@ -260,6 +260,7 @@ GEM
     unf_ext (0.0.9.1-x64-mingw-ucrt)
     uri (0.13.0)
     wdm (0.1.1)
+    webrick (1.8.1)
 
 PLATFORMS
   x64-mingw-ucrt
@@ -272,6 +273,7 @@ DEPENDENCIES
   tzinfo (>= 1, < 3)
   tzinfo-data
   wdm (~> 0.1.1)
+  webrick (~> 1.8)
 
 BUNDLED WITH
    2.5.10

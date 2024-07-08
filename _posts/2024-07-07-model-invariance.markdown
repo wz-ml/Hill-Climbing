@@ -39,13 +39,15 @@ $$a_j = relu(b_{1_j} + \sum_i x_i w_{1_{ij}})$$
 $$y_k =  b_{2_k} + \sum_j a_j w_{2_{jk}}$$
 
 For a given $c$, Let's add $\nu$ to $b_{1_c}$.
+
 $$a_c = relu(b_{1_c} +  \left(\sum_i x_i w_{1_{ic}}\right) + \nu)$$
+
 $$y_k = b_{2_k} + \left(\sum_{j \neq c} a_j w_{2_{jk}} \right) + a_c w_{2_{ck}}$$
-If $relu(b_{1_j} + \sum_i x_i w_{1_{ij}}) = 0$ and $relu(b_{1_c} +  \left(\sum_i x_i w_{1_{ic}}\right) + \nu) = 0$:
+
+If $relu(b\_{1\_j} + \sum_i x\_i w\_{1\_{ij}}) = 0$ and $relu(b\_{1\_c} +  \left(\sum\_i x\_i w_{1_{ic}}\right) + \nu) = 0$:
 - There's no impact on the function by changing $\nu$, since the relu kills the change.
 
 If $a_c$ increases by $\nu$:
-- We can maintain $y_k$ by modifying $
-Otherwise, we can maintain $y_k$ by reducing $b_{2k}$ by $\nu$ or modifying $w_{2_{ck}}$.
+- We can maintain $y\_k$ by reducing $b_{2k}$ by $\nu$ or modifying $w\_{2\_{ck}}$.
 
 Things get a little more tricky when part of the $\nu$ increase is cut off by the relu boundary, but you can informally always reduce $b_{2k}$ by the same amount as $a_c$ increases to maintain the same function $y(x)$.

@@ -15,6 +15,8 @@ $$\hat{\pi}^* = \underset{\text{argmin}}{\pi} \sum_{\xi \in \Xi} \sum_{x \in \xi
 
 where $L$ is the cost function, $\pi^ * (x)$ is the expert's action at state $x$, and $\hat{\pi}^*$ is the approximated policy.
 
+![](https://miro.medium.com/v2/resize:fit:620/0*A-G4NfY9Zi5O8e-v.png)
+
 <!--more-->
 
 In many cases, expert demonstrations will not be uniformly sampled across the entire state space, and therefore it's likely that the learned policy will perform poorly when not close to states found in $\xi$. This is particularly true when the expert demonstrations come from a *trajectory* of sequencial states and actions, such that the *distribution* of the sampled states $x$ in the dataset is **defined by the expert policy**.
