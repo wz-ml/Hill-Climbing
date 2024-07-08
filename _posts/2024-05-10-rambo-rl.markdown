@@ -4,14 +4,19 @@ title:  "Robust Inverse RL, Explained"
 date:   2024-05-10 12:27:49 -0700
 categories: post
 excerpt_separator: <!--more-->
+toc: true
 ---
-### Tl;dr 
+### Inverse RL has the problem of compounding error. How do we fix this?
 RAMBO-RL is an offline RL algorithm that is based on three primary ideas:
 1. There's a small random shift between the experience samples we have and the underlying distribution, so we'd like to train our offline RL models to have good *worst-case* performance instead of good *average-case* performance.
 2. Adding an adversary makes the model's worst-case performance robust.
 3. We can embed this adversary into the state transition model.
 
+<br>
+
 #### Got more time? Read on.
+
+<img src="{{ site.baseurl }}/assets/imgs/rambo_rl_img.jpg" width="300" alt="Banner Image">
 <!--more-->
 
 ## RARL

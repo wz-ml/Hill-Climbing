@@ -4,6 +4,7 @@ title:  "Why DNN Loss Landscapes aren't Convex"
 date:   2024-07-07 21:04:30 -0600
 categories: post
 excerpt_separator: <!--more-->
+toc: true
 ---
 
 ## Introduction
