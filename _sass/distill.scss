@@ -1,0 +1,32 @@
+.distill-layout {
+    display: flex;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .sidebar {
+    width: 200px;
+    padding: 20px;
+    background-color: #f5f5f5;
+  }
+  
+  .content {
+    flex: 1;
+    padding: 20px;
+  }
+  
+  .annotations {
+    width: 200px;
+    padding: 20px;
+    background-color: #f0f0f0;
+  }
+  
+  @media screen and (max-width: 800px) {
+    .distill-layout {
+      flex-direction: column;
+    }
+    
+    .sidebar, .annotations {
+      width: 100%;
+    }
+  }

@@ -1,0 +1,30 @@
+<nav class="toc">
+    <h2>Contents</h2>
+    <ul>
+      {% assign headers = content | split: '<h2' %}
+      {% for header in headers %}
+        {% if forloop.first == false %}
+          {% assign h2_content = header | split: '</h2>' | first %}
+          {% assign h2_text = h2_content | split: '>' | last | strip_html | strip %}
+          <li>
+            <a href="#{{ h2_text | slugify }}">{{ h2_text }}</a>
+            
+            {% assign subheaders = header | split: '<h3' %}
+            {% if subheaders.size > 1 %}
+              <ul>
+                {% for subheader in subheaders %}
+                  {% if forloop.first == false %}
+                    {% assign h3_content = subheader | split: '</h3>' | first %}
+                    {% assign h3_text = h3_content | split: '>' | last | strip_html | strip %}
+                    <li>
+                      <a href="#{{ h3_text | slugify }}">{{ h3_text }}</a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </nav>
