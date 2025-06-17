@@ -22,7 +22,7 @@ title: Hill Climbing
 email: willzhou97@g.ucla.edu
 description: Complex ML concepts explained simply.
 domain: wz-ml.github.io
-baseurl: # the subpath of your site, e.g. /blog
+baseurl: /Hill-Climbing # the subpath of your site, e.g. /blog
 url: https://wz-ml.github.io # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: https://twitter.com/wz3ml
 github_username:  https://github.com/wz-ml
