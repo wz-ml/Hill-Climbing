@@ -30,6 +30,7 @@ show_excerpts: true
 
 # Build settings
 theme: minima
+permalink: /:title/
 plugins:
   - jekyll-feed
   - jekyll-seo-tag

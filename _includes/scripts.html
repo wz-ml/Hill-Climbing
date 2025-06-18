@@ -1,20 +1,27 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
-
 <script type="text/x-mathjax-config">
-    MathJax.Hub.Config({
-        tex2jax: {
-          inlineMath: [['$','$'], ['\\(','\\)']],
-          displayMath: [['$$','$$'], ['\\[','\\]']],
-          processEscapes: true,
-          processEnvironments: true,
-        },
-        TeX: {
-          extensions: ["AMSmath.js", "AMSsymbols.js", "noErrors.js", "noUndefined.js"]
-        },
-        displayAlign: 'center',
-        "HTML-CSS": {
-          styles: {'.MathJax_Display': {"margin": 0}},
-          linebreaks: { automatic: true }
-        }
-      });
-    </script>
+  MathJax.Hub.Config({
+      tex2jax: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']],
+        processEscapes: true,
+        processEnvironments: true,
+      },
+      TeX: {
+        extensions: ["AMSmath.js", "AMSsymbols.js", "noErrors.js", "noUndefined.js"]
+      },
+      displayAlign: 'center',
+      "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}},
+        linebreaks: { automatic: true }
+      }
+    });
+  </script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded', function() {
+  mermaid.initialize({startOnLoad:true});
+});</script>

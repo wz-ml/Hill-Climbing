@@ -14,6 +14,14 @@
     flex: 1;
     padding: 20px;
   }
+
+  pre{
+    max-width: 100%;
+    margin: 0 auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
   
   .annotations {
     width: 200px;
