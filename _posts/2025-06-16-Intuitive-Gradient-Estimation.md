@@ -172,11 +172,16 @@ class ExpertLayer(torch.nn.Module):
         self.experts = torch.nn.ModuleList([torch.nn.Linear(model_dim, model_dim) for _ in range(num_experts)])
 
     def forward(self, x, chosen_expert):
-        return self.experts[chosen_expert.item()](x)
+        batch_size = x.shape[0]
+        outputs = []
+        for i in range(batch_size):
+            expert_idx = chosen_expert[i].item()
+            outputs.append(self.experts[expert_idx](x[i:i+1]))
+        return torch.cat(outputs, dim=0)
     
-class SimpleNN(torch.nn.Module):
+class RoutingNN(torch.nn.Module):
     def __init__(self, model_dim, num_experts):
-        super(SimpleNN, self).__init__()
+        super(RoutingNN, self).__init__()
         self.routing_layer = RoutingLayer(model_dim, num_experts)
         self.expert_layer = ExpertLayer(model_dim, num_experts)
 
@@ -229,64 +234,26 @@ Let's just pretend that the local non-differentiable gradient is 1:
 
 $$\left[\underset{\text{Local Gradient}}{\frac{\partial y}{\partial p}}\right] \approx 1$$
 
-Huhh?? Does this actually work?
+Wait, what? Does this actually work?
 
 <img src="{{ site.baseurl }}/assets/gradient_estimation/stenncomparison1.png" alt="alt text" style="width: 90%; display: block; margin: 0 auto;">
+
+<p style="text-align: center; font-style: italic; font-size: 0.9em; color: #666;">RoutingNN is our original routing model, and STENN is the same routing model + STE trick.</p>
 
 Yes. <br/>
 
 To test this out, I wrote a bunch of code that compares the routing layer above and the routing layer with the STE trick in learning this linear piecewise function:
 <img src="{{ site.baseurl }}/assets/gradient_estimation/triangular_fn.png" alt="alt text" style="width: 60%; display: block; margin: 0 auto;">
 
-In this setup I have three experts, and each expert is just a 1x1 linear projection. To learn this shape, the routing layer will need to route to the linear projection that corresponds to the right piece of the function.
+In this setup I have three experts, and each expert is a 1x1 linear projection. To learn this shape, the routing layer will need to route to the linear projection that corresponds to the right piece of the function.
 
 <aside>
 <details markdown="1">
 
 <summary>Code</summary>
 
-```python
-import torch
-from torch.nn import functional as F
-
-class RoutingLayer(torch.nn.Module):
-    def __init__(self, model_dim, num_experts):
-        super(RoutingLayer, self).__init__()
-        self.model_dim = model_dim
-        self.num_experts = num_experts
-        self.forward_proj = torch.nn.Linear(model_dim, num_experts)
-
-    def forward(self, x):
-        forward_proj = self.forward_proj(x)
-        forward_proj = F.softmax(forward_proj, dim=-1)
-        chosen_expert = torch.multinomial(forward_proj, 1)
-        return chosen_expert
-
-class ExpertLayer(torch.nn.Module):
-    def __init__(self, model_dim, num_experts):
-        super(ExpertLayer, self).__init__()
-        self.model_dim = model_dim
-        self.num_experts = num_experts
-        self.experts = torch.nn.ModuleList([torch.nn.Linear(model_dim, model_dim) for _ in range(num_experts)])
-
-    def forward(self, x, chosen_expert):
-        batch_size = x.shape[0]
-        outputs = []
-        for i in range(batch_size):
-            expert_idx = chosen_expert[i].item()
-            outputs.append(self.experts[expert_idx](x[i:i+1]))
-        return torch.cat(outputs, dim=0)
-    
-class RoutingNN(torch.nn.Module):
-    def __init__(self, model_dim, num_experts):
-        super(RoutingNN, self).__init__()
-        self.routing_layer = RoutingLayer(model_dim, num_experts)
-        self.expert_layer = ExpertLayer(model_dim, num_experts)
-
-    def forward(self, x):
-        chosen_expert = self.routing_layer(x)
-        return self.expert_layer(x, chosen_expert)
-```
+RoutingNN is unchanged from above. We add a new class, STERoutingLayer, which acts the same as above but uses the STE trick
+to update the routing weights.
 
 ```python
 import torch
@@ -452,7 +419,6 @@ Turns out the STE trick works pretty well in helping our routing layer learn:
 
 <img src="{{ site.baseurl }}/assets/gradient_estimation/stenncomparison2.png" alt="alt text" style="width: 80%; display: block; margin: 0 auto;">
 
-
 If you're like me, this makes you very confused. We apply a surrogate gradient to the backwards pass; the forwards pass has disentangled itself from the backwards pass! The gradients calculated by the backwards pass aren't the *real* gradient of the loss with respect to the weights. Of course, the reason we're doing this in the first place is because some portion of the true loss landscape is non-differentiable. Nonetheless, it's still surprising that the direction we take in accordance with our "fake" gradient still decreases the true loss.
 
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">Straight Through estimator is a magic door between cont/discrete. If people really cracked it at scale for 1.58 bits models, might be useful for all kinds of wild applications.</p>&mdash; Sasha Rush (@srush_nlp) <a href="https://twitter.com/srush_nlp/status/1774788865418482087?ref_src=twsrc%5Etfw">April 1, 2024</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
@@ -464,7 +430,7 @@ If you're like me, this makes you very confused. We apply a surrogate gradient t
 Worse yet, the bias in the gradient estimator propagates. Every layer before the non-differentiable operation is updating according to the surrogate gradient. This surrogate loss landscape must have some nice properties indeed such that the surrogate gradient direction matches the true one - if not in magnitude, then in direction.
 
 
-Okay, so what does the loss landscape look like?
+So what does the loss landscape look like?
 
 ## The Loss Landscape
 
@@ -475,7 +441,7 @@ Okay, so what does the loss landscape look like?
         scrolling="no">
 </iframe>
 
-It's a little hard to compute the surrogate loss landscape, since we only interact with it via its gradient (and analytical integration methods terrify me). But we can still visualize the surrogate update steps we'd be taking at each point in the true loss landscape. Here, I've sampled a bunch of points on the loss landscape to form a surface and calculated the surrogate gradient (the little white cones).
+It's difficult to compute the surrogate loss landscape, since we only interact with it via its gradient (and analytical integration methods terrify me). But we can still visualize the surrogate update steps we'd be taking at each point in the true loss landscape. Here, I've sampled a bunch of points on the loss landscape to form a surface and calculated the surrogate gradient (the little white cones).
 
 > While the surrogate gradient differs significantly from the true gradient, following the surrogate gradient still leads to the same minima.
 
