@@ -205,7 +205,7 @@ make_dot(loss, params=dict(model.named_parameters()))
 </aside>
 <br/>
 
-<img src="{{ site.baseurl }}/assets/imgs/routing_autograd.png" alt="alt text" style="width: 60%; display: block; margin: 0 auto;">
+<img src="{{ site.baseurl }}/assets/gradient_estimation/routing_autograd.png" alt="alt text" style="width: 60%; display: block; margin: 0 auto;">
 
 ## The backprop hack
 In the literature, there are a few ways we can backprop through non-differentiable operations. Most of them introduce a **surrogate gradient** that provides some learning signal and pushes the parameters of the non-differentiable operation in the right direction. As a whole, this field is called **gradient estimation**.
@@ -231,12 +231,12 @@ $$\left[\underset{\text{Local Gradient}}{\frac{\partial y}{\partial p}}\right] \
 
 Huhh?? Does this actually work?
 
-<img src="{{ site.baseurl }}/assets/imgs/stenncomparison1.png" alt="alt text" style="width: 90%; display: block; margin: 0 auto;">
+<img src="{{ site.baseurl }}/assets/gradient_estimation/stenncomparison1.png" alt="alt text" style="width: 90%; display: block; margin: 0 auto;">
 
 Yes. <br/>
 
 To test this out, I wrote a bunch of code that compares the routing layer above and the routing layer with the STE trick in learning this linear piecewise function:
-<img src="{{ site.baseurl }}/assets/imgs/triangular_fn.png" alt="alt text" style="width: 60%; display: block; margin: 0 auto;">
+<img src="{{ site.baseurl }}/assets/gradient_estimation/triangular_fn.png" alt="alt text" style="width: 60%; display: block; margin: 0 auto;">
 
 In this setup I have three experts, and each expert is just a 1x1 linear projection. To learn this shape, the routing layer will need to route to the linear projection that corresponds to the right piece of the function.
 
@@ -450,10 +450,10 @@ plt.show()
 
 Turns out the STE trick works pretty well in helping our routing layer learn:
 
-<img src="{{ site.baseurl }}/assets/imgs/stenncomparison2.png" alt="alt text" style="width: 80%; display: block; margin: 0 auto;">
+<img src="{{ site.baseurl }}/assets/gradient_estimation/stenncomparison2.png" alt="alt text" style="width: 80%; display: block; margin: 0 auto;">
 
 
-If you're like me, this makes you very confused. We apply a surrogate gradient to the backwards pass; the forwards pass has disentangled itself from the backwards pass! The gradients calculated by the backwards pass aren't the *real* gradient of the loss with respect to the weights.
+If you're like me, this makes you very confused. We apply a surrogate gradient to the backwards pass; the forwards pass has disentangled itself from the backwards pass! The gradients calculated by the backwards pass aren't the *real* gradient of the loss with respect to the weights. Of course, the reason we're doing this in the first place is because some portion of the true loss landscape is non-differentiable. Nonetheless, it's still surprising that the direction we take in accordance with our "fake" gradient still decreases the true loss.
 
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">Straight Through estimator is a magic door between cont/discrete. If people really cracked it at scale for 1.58 bits models, might be useful for all kinds of wild applications.</p>&mdash; Sasha Rush (@srush_nlp) <a href="https://twitter.com/srush_nlp/status/1774788865418482087?ref_src=twsrc%5Etfw">April 1, 2024</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
@@ -467,3 +467,47 @@ Worse yet, the bias in the gradient estimator propagates. Every layer before the
 Okay, so what does the loss landscape look like?
 
 ## The Loss Landscape
+
+<iframe src="{{ site.baseurl }}/assets/gradient_estimation/routing_layer_loss_landscape.html" 
+        frameborder="0" 
+        width="700" 
+        height="800" 
+        scrolling="no">
+</iframe>
+
+It's a little hard to compute the surrogate loss landscape, since we only interact with it via its gradient (and analytical integration methods terrify me). But we can still visualize the surrogate update steps we'd be taking at each point in the true loss landscape. Here, I've sampled a bunch of points on the loss landscape to form a surface and calculated the surrogate gradient (the little white cones).
+
+> While the surrogate gradient differs significantly from the true gradient, following the surrogate gradient still leads to the same minima.
+
+[Liu et al. 2023](https://arxiv.org/abs/2304.08612) prove that the STE, in expectation, is identical to the first-degree Taylor approximation of the true gradient:
+
+$$E[\hat{\nabla}_{ST}] = \hat{\nabla}_{1st-order}$$
+
+In our formulation, this would refer to:
+
+$$E[\nabla_{i} L] = \nabla_p L_{1st-order}$$
+
+or:
+
+$$E\left[\frac{\partial L}{\partial p}\right] = \text{1st-order}\left(\frac{\partial L}{\partial y}\right)$$
+
+Which implies that, in expectation, the gradients of the elements prior to the routing layer should at least have the same sign as the real gradient.
+
+For their proof, see Appendix A of their paper.
+<br/>
+
+## Conclusion
+
+The STE is a surprisingly robust approach for backpropagating through nondifferentiable functions. Have a stochastic variable in your neural network? No problem. In the backwards pass, pretend as if its gradient is the identity. Funnily enough, even Bengio called it a "heuristic method" [when he reviewed it in 2013](https://arxiv.org/abs/1308.3432):
+
+> A fourth approach heuristically copies the gradient with respect to the stochastic output directly as an estimator of the gradient with respect to the sigmoid argument (we call this the straight-through estimator).
+
+More modern works show that it's surprisingly robust, and can be applied to a variety of problems - from Mixture of Experts to VQ-VAEs and sparse attention.
+
+Note that the way I've formulated STEs allows it to be applied to random categorical variables. Using it for deterministic non-differentiable operations (e.g argmax) requires a bit more finesse, which I'll discuss in the next post with Gumbel-Softmax.
+
+<br/>
+
+<img src="{{ site.baseurl }}/assets/gradient_estimation/gumballmachine.jpg" alt="alt text" style="width: 20%; display: block; margin: 0 auto;">
+<p style="text-align: center; font-style: italic; font-size: 0.9em; color: #666;">yum.</p>
+
