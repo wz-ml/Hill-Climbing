@@ -6,7 +6,7 @@ permalink: /about/
 
 
 ### Hi there! I'm William.
-- 🔭 I’m currently working on RL research at UCLA's Bolei Zhou Lab.
+- 🔭 I’m currently working on [Triton](https://triton-lang.org/main/index.html) GPU kernels at AMD.
 - ⚡ Fun fact: I prefer tabs over spaces for indentation.
 The [Feynman Technique](https://en.wikipedia.org/wiki/Learning_by_teaching) stipulates that a nice way to learn stuff is to see if you can explain it to someone else in simple language. Over the course of the past few months, I've been writing posts to myself to supplement my ML knowledge. Hill Climbing is an effort to clean up and formalize these posts.
 

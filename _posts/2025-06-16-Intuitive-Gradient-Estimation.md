@@ -10,7 +10,9 @@ toc: true
 ## Introduction
 Neural networks work well through the magic of backpropagation, but there are times
 when we can't backpropagate through our layers. Let's imagine we have a simple problem:
-we want to make our neural network cheaper by routing our computation through one of many possible layers or "experts", like so:
+We have a [Mixture of Experts (MoE)](https://huggingface.co/blog/moe) model with a probabilistic routing layer.
+
+To be specific, our routing layer selects one expert to route its computation through.
 
 <div class="mermaid" style="width: 70%; height: 70%; margin: 0 auto;">
 graph TD
@@ -25,7 +27,29 @@ graph TD
 
 <!--more-->
 
-Our router just takes in our input vector $x \in \mathbb{R}^d$ and outputs a probability distribution over our experts.
+<aside>
+<details>
+<summary>
+What's a Mixture of Experts?
+</summary>
+
+MoE is a common technique used in many state of the art (SOTA) large language models, including GPT-4.
+The core idea is that we can save forward pass computation by selecting one (or a few) of multiple possible layer blocks to
+conduct an operation. This is done by having two components:
+1. The routing layer.
+2. The set of experts.
+
+Depending on the incoming vector, the routing layer selects the expert that's best suited for the job to process that vector.
+
+Given this, consider the problem of how you'd train the routing layer.
+
+</details>
+
+<br/>
+
+</aside>
+
+Our router is a simple linear projection and softmax that takes in our input vector $x \in \mathbb{R}^d$ to produce probability distribution over three experts.
 
 <div id="plot1" style="width: 50%; height: 20%; margin: 0 auto;">
 <script>
@@ -65,7 +89,7 @@ Our router just takes in our input vector $x \in \mathbb{R}^d$ and outputs a pro
 
 Mathematically, we express this as $p = \text{softmax}(x W_r)$, where $W_r \in \mathbb{R}^{d \times k}$ is our routing matrix. We can sample from this distribution to get a single expert to route to ($i \sim p$), before running the rest of our network as usual ($l_{out} = \text{Expert}_i(x)$).
 
-Specifically, we have:
+We have:
 
 - Logits: The input `x` passes through a linear layer to produce logits $l$ for each expert.
 
@@ -86,6 +110,10 @@ $$y = \text{One-Hot}(i)$$
 - Routing: We compute the output of our layer as $l_{out} = \text{Expert}_i (x)$. Mathematically, this is equal to:
 
 $$l_{out} = \sum_{j=1}^k y_j\ \text{Expert}_j(x)$$
+
+Note that there's a slight mathematical sleight-of-hand here to simplify the STE conceptualization for later on. 
+
+Our router normally **indexes** the expert list to pick one selected expert. Here, I write this as taking the dot product of the one-hot indexing vector with the vector of outputs from all the experts. Effectively, activating all the experts and throwing away all of the outputs except for the one chosen (dot-producting with a one-hot vector) is the same as activating a single expert. 
 
 <aside>
 <details>
@@ -132,7 +160,8 @@ graph TD
     style H fill:#ffcccc
 </div>
 
-When it comes to the backwards pass, we have a problem: How do we update our routing layer?
+This graph mirrors the sequential math operations outlined above, and I've highlighted the nondifferentiable operations in red. Now the problem becomes clear: 
+during the backwards pass, how do we update our routing layer?
 
 The [chain rule](https://www.3blue1brown.com/lessons/backpropagation-calculus) gives us:
 
@@ -195,7 +224,7 @@ MODEL_DIM = 8
 BATCH_SIZE = 1
 NUM_EXPERTS = 3
 x = torch.randn(BATCH_SIZE, MODEL_DIM)
-model = SimpleNN(model_dim = MODEL_DIM, num_experts = NUM_EXPERTS)
+model = RoutingNN(model_dim = MODEL_DIM, num_experts = NUM_EXPERTS)
 
 chosen_expert = model.routing_layer(x)
 output = model.expert_layer(x, chosen_expert)
@@ -210,18 +239,29 @@ make_dot(loss, params=dict(model.named_parameters()))
 </aside>
 <br/>
 
-<img src="{{ site.baseurl }}/assets/gradient_estimation/routing_autograd.png" alt="alt text" style="width: 60%; display: block; margin: 0 auto;">
+<img src="{{ site.baseurl }}/assets/gradient_estimation/routing_autograd.png" alt="Autograd Routing Graph" style="width: 60%; display: block; margin: 0 auto;">
+
+Note that there's no gradient flow to any blocks with the name prefix `routing_layer`. For what the autograd compute graph *should* look like if the routing layer were trainable, see below.
+
+<aside>
+
+<details>
+<summary>Diagram</summary>
+<img src="{{ site.baseurl }}/assets/gradient_estimation/FullComputeGraph.png" alt="Autograd Routing Graph w/trainable routing layer" style="width: 90%; display: block; margin: 0 auto;">
+
+</details>
+</aside>
 
 ## The backprop hack
-In the literature, there are a few ways we can backprop through non-differentiable operations. Most of them introduce a **surrogate gradient** that provides some learning signal and pushes the parameters of the non-differentiable operation in the right direction. As a whole, this field is called **gradient estimation**.
+In the literature, there are a few ways we can backprop through non-differentiable operations. Most of them introduce a **surrogate gradient** that provides some learning signal and pushes the parameters of the non-differentiable operation in the right direction, and is what we'll explore for the rest of this post. In the chain rule, the surrogate gradient replaces the local gradient (which is uncomputable). As a whole, this field is called **gradient estimation**.
 
-Without going too deep into the methods, here are a few of them:
+Without going too far into the field, here are a few gradient estimation methods:
 
 - Straight-Through Estimators (STEs): We pretend that the non-differentiable operation is the identity function during the backwards pass. It's called "straight-through" because we pass straight through the non-differentiable operations (the three blocks in red above) as if they were not there. In this case, we'd approximate:
 
 $$\frac{\partial L}{\partial p} \approx \frac{\partial L}{\partial y}$$
 
-- REINFORCE: We literally do reinforcement learning on the troublesome operation. As you might expect from RL, this gradient estimator is extremely high-variance and will very likely blow up your model during training.
+- REINFORCE: We conduct reinforcement learning on the troublesome operation. As you may expect from RL, this gradient estimator is high-variance and can explode your model during training if not properly handled.
 
 $$\nabla_\theta \mathbb{E}[L] = \mathbb{E}\left[\frac{\partial L}{\partial y} \cdot \nabla_\theta \log p_\theta(k|x)\right]$$
 
@@ -234,11 +274,15 @@ Let's just pretend that the local non-differentiable gradient is 1:
 
 $$\left[\underset{\text{Local Gradient}}{\frac{\partial y}{\partial p}}\right] \approx 1$$
 
-Wait, what? Does this actually work?
+Such that:
+
+$$\underset{\text{Routing Gradient}}{\frac{\partial L}{\partial p}} = \underset{\text{Incoming Gradient}}{\frac{\partial L}{\partial y}}$$
+
+Given how simple this estimation is, does it work?
 
 <img src="{{ site.baseurl }}/assets/gradient_estimation/stenncomparison1.png" alt="alt text" style="width: 90%; display: block; margin: 0 auto;">
 
-<p style="text-align: center; font-style: italic; font-size: 0.9em; color: #666;">RoutingNN is our original routing model, and STENN is the same routing model + STE trick.</p>
+<p style="text-align: center; font-style: italic; font-size: 0.9em; color: #666;">RoutingNN is our routing model defined in the above computational graph, and STENN is the same routing model + STE trick.</p>
 
 Yes. <br/>
 
@@ -415,22 +459,22 @@ plt.show()
 
 </aside>
 
-Turns out the STE trick works pretty well in helping our routing layer learn:
+The STE trick successfully guides the routing layer in modeling the triangular function:
 
 <img src="{{ site.baseurl }}/assets/gradient_estimation/stenncomparison2.png" alt="alt text" style="width: 80%; display: block; margin: 0 auto;">
 
-If you're like me, this makes you very confused. We apply a surrogate gradient to the backwards pass; the forwards pass has disentangled itself from the backwards pass! The gradients calculated by the backwards pass aren't the *real* gradient of the loss with respect to the weights. Of course, the reason we're doing this in the first place is because some portion of the true loss landscape is non-differentiable. Nonetheless, it's still surprising that the direction we take in accordance with our "fake" gradient still decreases the true loss.
+At first glance, this appears strange. We apply a surrogate gradient to the backwards pass, causing the computed gradients to no longer be the true directions of steepest descent of the loss landscape. While the reason we must apply a surrogate gradient is because we have a nondifferentiable operation in our forwards pass (i.e it's unsurprising that the gradient estimation approach outperforms an approach that leaves the non-differentiable layer unlearnable), the wide success of gradient estimation for SOTA models across domains is surprising.
 
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">Straight Through estimator is a magic door between cont/discrete. If people really cracked it at scale for 1.58 bits models, might be useful for all kinds of wild applications.</p>&mdash; Sasha Rush (@srush_nlp) <a href="https://twitter.com/srush_nlp/status/1774788865418482087?ref_src=twsrc%5Etfw">April 1, 2024</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
 <br/>
 
-> Imagine we're descending down a loss landscape. Instead of going in the direction that slopes steepest downhill, we check our GPS, which contains a totally *different* heightmap. Then we take a step in the downhill direction on the GPS map, which could mean in reality taking a step orthogonal to the slope or uphill or something. 
+> Imagine we're descending down a loss landscape. Instead of going in the direction that slopes steepest downhill, we check our GPS, which contains a totally *different* heightmap. Then we take a step in the downhill direction on the GPS map, which could mean in reality taking a step orthogonal to the slope or uphill. 
 
-Worse yet, the bias in the gradient estimator propagates. Every layer before the non-differentiable operation is updating according to the surrogate gradient. This surrogate loss landscape must have some nice properties indeed such that the surrogate gradient direction matches the true one - if not in magnitude, then in direction.
+The bias in the gradient estimator also affects all layers prior to the non-differentiable operation, as the surrogate gradient is part of their gradient flow as per the chain rule. This surrogate loss landscape must have some nice properties indeed such that the surrogate gradient direction matches the true one - if not in magnitude, then in direction.
 
 
-So what does the loss landscape look like?
+What does the loss landscape look like?
 
 ## The Loss Landscape
 
@@ -443,7 +487,9 @@ So what does the loss landscape look like?
 
 It's difficult to compute the surrogate loss landscape, since we only interact with it via its gradient (and analytical integration methods terrify me). But we can still visualize the surrogate update steps we'd be taking at each point in the true loss landscape. Here, I've sampled a bunch of points on the loss landscape to form a surface and calculated the surrogate gradient (the little white cones).
 
-> While the surrogate gradient differs significantly from the true gradient, following the surrogate gradient still leads to the same minima.
+> While the surrogate gradient differs significantly from the true gradient, following the surrogate gradient (in this case) still yields convergence to the same minima.
+
+This is a surprising empirical result and scales well, being used in modern VQ-VAEs and MoEs of billions of parameters. Theory has followed and yielded some justifications for STE's efficacy.
 
 [Liu et al. 2023](https://arxiv.org/abs/2304.08612) prove that the STE, in expectation, is identical to the first-degree Taylor approximation of the true gradient:
 
@@ -468,7 +514,7 @@ The STE is a surprisingly robust approach for backpropagating through nondiffere
 
 > A fourth approach heuristically copies the gradient with respect to the stochastic output directly as an estimator of the gradient with respect to the sigmoid argument (we call this the straight-through estimator).
 
-More modern works show that it's surprisingly robust, and can be applied to a variety of problems - from Mixture of Experts to VQ-VAEs and sparse attention.
+Modern works show that the STE is surprisingly robust, and works well when applied naively to a large variety of methods. While other gradient estimators expand upon STEs, they're a simple and theory-backed baseline that we'll build off (hopefully in similar posts in the future). 
 
 Note that the way I've formulated STEs allows it to be applied to random categorical variables. Using it for deterministic non-differentiable operations (e.g argmax) requires a bit more finesse, which I'll discuss in the next post with Gumbel-Softmax.
 
